@@ -48,15 +48,18 @@ static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
  *   GLOBAL FUNCTIONS
  **********************/
 
+void rounder_cb(struct _disp_drv_t * disp_drv, lv_area_t *area) {
+  area->y1 = (area->y1 & (~0x7));
+  area->y2 = (area->y2 & (~0x7)) + 7;
+}
+
 void lv_port_disp_init(void)
 {
     /*-------------------------
      * Initialize your display
      * -----------------------*/
     disp_init();
-    lv_refr_set_round_cb( round_cb );
-    disp_drv_p->vdb_wr = vdb_wr;
-    disp_drv_p->disp_flush = disp_flush;
+    /* disp_drv_p->vdb_wr = vdb_wr; */
 
     /*-----------------------------
      * Create a buffer for drawing
@@ -128,6 +131,8 @@ void lv_port_disp_init(void)
      * But if you have a different GPU you can use with this callback.*/
     //disp_drv.gpu_fill_cb = gpu_fill;
 
+    disp_drv.rounder_cb = rounder_cb;
+
     /*Finally register the driver*/
     lv_disp_drv_register(&disp_drv);
 }
@@ -181,6 +186,50 @@ static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
      *Inform the graphics library that you are ready with the flushing*/
     lv_disp_flush_ready(disp_drv);
 }
+/* This part most certainly will not work. First task though is just compilation */
+
+
+#define SPI_DC        LATAbits.LATA1
+#define SPI_DATA()    SPI_DC = 1
+#define SPI_COMMAND() SPI_DC = 0
+void oledByteOut( uint8_t data )
+{
+  /* SPI1BUF = data; */
+  /* while(SPI1STATbits.SPIRBF == 0); */
+  /* data = SPI1BUF; // have to read as well */
+}
+
+void oledCommand( uint8_t data )
+{
+    /* SPI_COMMAND(); */
+    oledByteOut(data);
+}
+
+void oledStartSend( uint8_t row, uint8_t col ) {
+  oledCommand( 0xB0 | row);
+  // goto first column
+  col += 2; // +2 for SH1106 - remove for SSD1306
+  oledCommand( 0x00 | (col & 0xF) );      // col LS 4 bits 
+  oledCommand( 0x10 | ((col>>4) & 0xF) ); // col MS 4 bits
+  /* SPI_DATA(); */
+}
+void oledEndSend() {
+}
+void oledInit()
+{
+    /* TRISBbits.TRISB7 = 0; RPOR3bits.RP7R = 9;  // RP7 is pin 16 on GB002, 9 selects SS1OUT to drive Chip Select */
+    /*  */
+    /* SPI1CON1 = 0; // Clear the content of SPI1CON1 register  */
+    /* SPI1CON1bits.CKP = 1;   // Idle state for clock is a high level; active state is a low level */
+    /* SPI1CON1bits.CKE = 0;   // Serial output data changes on transition from idle clock state to active clock state */
+    /* SPI1CON1bits.MSTEN = 1; // Enable master mode */
+    /* // oLed says 600ns -> 1.67Mhz, so use 4:1,4:1 = 1MHz (pg180) */
+    /* //  measured period was 750ns, which is 1.3MHz - don't know why */
+    /* SPI1CON1bits.PPRE = 2;  // primary prescaler 3 = 1:1, 2 = 4:1 */
+    /* SPI1CON1bits.SPRE = 5;  // secondary prescaler 5 = 4:1    */
+    /* SPI1STATbits.SPIEN = 1; // Enable SPI peripheral */
+}
+
 /* Code specific to SSD1306. TODO: Move this to Zig */
 #define BIT_SET(a,b) ((a) |= (1U<<(b)))
 #define BIT_CLEAR(a,b) ((a) &= ~(1U<<(b)))
@@ -212,56 +261,8 @@ static void flush_cb(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_
     }
     /* IMPORTANT!!!
      * Inform the graphics library that you are ready with the flushing*/
-    lv_flush_ready();
+    lv_display_flush_ready();
 }
-void rounder_cb(struct _disp_drv_t * disp_drv, lv_area_t *area) {
-  area->y1 = (area->y1 & (~0x7)); 
-  area->y2 = (area->y2 & (~0x7)) + 7;
-}
-/* This part most certainly will not work. First task though is just compilation */
-
-
-#define SPI_DC        LATAbits.LATA1
-#define SPI_DATA()    SPI_DC = 1
-#define SPI_COMMAND() SPI_DC = 0
-void oledByteOut( uint8_t data )
-{
-  SPI1BUF = data;
-  while(SPI1STATbits.SPIRBF == 0);
-  data = SPI1BUF; // have to read as well
-}
-
-void oledCommand( uint8_t data )
-{
-    SPI_COMMAND();
-    oledByteOut(data);
-}
-
-void oledStartSend( uint8_t row, uint8_t col ) {
-  oledCommand( 0xB0 | row);
-  // goto first column
-  col += 2; // +2 for SH1106 - remove for SSD1306
-  oledCommand( 0x00 | (col & 0xF) );      // col LS 4 bits 
-  oledCommand( 0x10 | ((col>>4) & 0xF) ); // col MS 4 bits
-  SPI_DATA();
-}
-void oledEndSend() {
-}
-void oledInit()
-{
-    TRISBbits.TRISB7 = 0; RPOR3bits.RP7R = 9;  // RP7 is pin 16 on GB002, 9 selects SS1OUT to drive Chip Select
-    
-    SPI1CON1 = 0; // Clear the content of SPI1CON1 register 
-    SPI1CON1bits.CKP = 1;   // Idle state for clock is a high level; active state is a low level
-    SPI1CON1bits.CKE = 0;   // Serial output data changes on transition from idle clock state to active clock state
-    SPI1CON1bits.MSTEN = 1; // Enable master mode
-    // oLed says 600ns -> 1.67Mhz, so use 4:1,4:1 = 1MHz (pg180)
-    //  measured period was 750ns, which is 1.3MHz - don't know why
-    SPI1CON1bits.PPRE = 2;  // primary prescaler 3 = 1:1, 2 = 4:1
-    SPI1CON1bits.SPRE = 5;  // secondary prescaler 5 = 4:1   
-    SPI1STATbits.SPIEN = 1; // Enable SPI peripheral
-}
-
 /*OPTIONAL: GPU INTERFACE*/
 
 /*If your MCU has hardware accelerator (GPU) then you can use it to fill a memory with a color*/

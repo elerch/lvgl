@@ -226,7 +226,10 @@ pub fn build(b: *std.Build) void {
         "src/draw/sdl/lv_draw_sdl_arc.c",
         "src/draw/sdl/lv_draw_sdl_label.c",
         "src/draw/sdl/lv_draw_sdl_bg.c",
-    }, &.{});
+    }, &.{
+        "-DLV_CONF_INCLUDE_SIMPLE",
+        "-DLV_LVGL_H_INCLUDE_SIMPLE",
+    });
     // This declares intent for the library to be installed into the standard
     // location when the user invokes the "install" step (the default step when
     // running `zig build`).

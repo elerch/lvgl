@@ -28,8 +28,8 @@
 
 /* See: https://blog.lvgl.io/2019-05-06/oled */
 #define LV_MEM_SIZE             (2U * 1024U)    /* Size memory used by `lv_mem_alloc` in bytes (>= 2kB) */
-#define LV_HOR_RES              (128)
-#define LV_VER_RES              (64)
+#define LV_HOR_RES_MAX          (128)
+#define LV_VER_RES_MAX          (64)
 #define LV_ANTIALIAS            0               /* 1: Enable anti-aliasing */
 
 #define LV_COLOR_DEPTH          1               /* Color depth: 1/8/16/32 */
