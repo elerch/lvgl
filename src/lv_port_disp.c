@@ -208,7 +208,7 @@ void oledCommand( uint8_t data )
 void oledStartSend( uint8_t row, uint8_t col ) {
   oledCommand( 0xB0 | row);
   // goto first column
-  col += 2; // +2 for SH1106 - remove for SSD1306
+  /* col += 2; // +2 for SH1106 - remove for SSD1306 */
   oledCommand( 0x00 | (col & 0xF) );      // col LS 4 bits 
   oledCommand( 0x10 | ((col>>4) & 0xF) ); // col MS 4 bits
   /* SPI_DATA(); */
