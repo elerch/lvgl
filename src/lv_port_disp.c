@@ -4,25 +4,23 @@
  */
 
 /*Copy this file as "lv_port_disp.c" and set this value to "1" to enable content*/
-#if 0
+#if 1
 
 /*********************
  *      INCLUDES
  *********************/
-#include "lv_port_disp_template.h"
+#include "lv_port_disp.h"
 #include <stdbool.h>
 
 /*********************
  *      DEFINES
  *********************/
 #ifndef MY_DISP_HOR_RES
-    #warning Please define or replace the macro MY_DISP_HOR_RES with the actual screen width, default value 320 is used for now.
-    #define MY_DISP_HOR_RES    320
+    #define MY_DISP_HOR_RES    128
 #endif
 
 #ifndef MY_DISP_VER_RES
-    #warning Please define or replace the macro MY_DISP_HOR_RES with the actual screen height, default value 240 is used for now.
-    #define MY_DISP_VER_RES    240
+    #define MY_DISP_VER_RES    64
 #endif
 
 /**********************
@@ -56,6 +54,9 @@ void lv_port_disp_init(void)
      * Initialize your display
      * -----------------------*/
     disp_init();
+    lv_refr_set_round_cb( round_cb );
+    disp_drv_p->vdb_wr = vdb_wr;
+    disp_drv_p->disp_flush = disp_flush;
 
     /*-----------------------------
      * Create a buffer for drawing
@@ -179,6 +180,86 @@ static void disp_flush(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_colo
     /*IMPORTANT!!!
      *Inform the graphics library that you are ready with the flushing*/
     lv_disp_flush_ready(disp_drv);
+}
+/* Code specific to SSD1306. TODO: Move this to Zig */
+#define BIT_SET(a,b) ((a) |= (1U<<(b)))
+#define BIT_CLEAR(a,b) ((a) &= ~(1U<<(b)))
+void set_px_cb(struct _disp_drv_t * disp_drv, uint8_t * buf, lv_coord_t buf_w, lv_coord_t x, lv_coord_t y,
+            lv_color_t color, lv_opa_t opa) {
+  uint16_t byte_index = x + (( y>>3 ) * buf_w);
+  uint8_t  bit_index  = y & 0x7;
+  // == 0 inverts, so we get blue on black
+  if ( color.full == 0 ) {
+    BIT_SET( buf[ byte_index ] , bit_index );
+  }
+  else {
+    BIT_CLEAR( buf[ byte_index ] , bit_index );
+  }
+}
+static void flush_cb(lv_disp_drv_t * disp_drv, const lv_area_t * area, lv_color_t * color_p)
+{
+    uint8_t row1 = area->y1>>3;
+    uint8_t row2 = area->y2>>3;
+    uint8_t *buf = (uint8_t*) color_p;
+
+    for(uint8_t row = row1; row <= row2; row++) {
+      oledStartSend( row, area->x1 );
+      for(uint16_t x = area->x1; x <= area->x2; x++) {
+        oledByteOut(*buf);
+        buf++;
+      }
+      oledEndSend();
+    }
+    /* IMPORTANT!!!
+     * Inform the graphics library that you are ready with the flushing*/
+    lv_flush_ready();
+}
+void rounder_cb(struct _disp_drv_t * disp_drv, lv_area_t *area) {
+  area->y1 = (area->y1 & (~0x7)); 
+  area->y2 = (area->y2 & (~0x7)) + 7;
+}
+/* This part most certainly will not work. First task though is just compilation */
+
+
+#define SPI_DC        LATAbits.LATA1
+#define SPI_DATA()    SPI_DC = 1
+#define SPI_COMMAND() SPI_DC = 0
+void oledByteOut( uint8_t data )
+{
+  SPI1BUF = data;
+  while(SPI1STATbits.SPIRBF == 0);
+  data = SPI1BUF; // have to read as well
+}
+
+void oledCommand( uint8_t data )
+{
+    SPI_COMMAND();
+    oledByteOut(data);
+}
+
+void oledStartSend( uint8_t row, uint8_t col ) {
+  oledCommand( 0xB0 | row);
+  // goto first column
+  col += 2; // +2 for SH1106 - remove for SSD1306
+  oledCommand( 0x00 | (col & 0xF) );      // col LS 4 bits 
+  oledCommand( 0x10 | ((col>>4) & 0xF) ); // col MS 4 bits
+  SPI_DATA();
+}
+void oledEndSend() {
+}
+void oledInit()
+{
+    TRISBbits.TRISB7 = 0; RPOR3bits.RP7R = 9;  // RP7 is pin 16 on GB002, 9 selects SS1OUT to drive Chip Select
+    
+    SPI1CON1 = 0; // Clear the content of SPI1CON1 register 
+    SPI1CON1bits.CKP = 1;   // Idle state for clock is a high level; active state is a low level
+    SPI1CON1bits.CKE = 0;   // Serial output data changes on transition from idle clock state to active clock state
+    SPI1CON1bits.MSTEN = 1; // Enable master mode
+    // oLed says 600ns -> 1.67Mhz, so use 4:1,4:1 = 1MHz (pg180)
+    //  measured period was 750ns, which is 1.3MHz - don't know why
+    SPI1CON1bits.PPRE = 2;  // primary prescaler 3 = 1:1, 2 = 4:1
+    SPI1CON1bits.SPRE = 5;  // secondary prescaler 5 = 4:1   
+    SPI1STATbits.SPIEN = 1; // Enable SPI peripheral
 }
 
 /*OPTIONAL: GPU INTERFACE*/
