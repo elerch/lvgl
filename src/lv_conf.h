@@ -12,7 +12,7 @@
  */
 
 /* clang-format off */
-#if 0 /*Set it to "1" to enable content*/
+#if 1 /*Set it to "1" to enable content*/
 
 #ifndef LV_CONF_H
 #define LV_CONF_H
@@ -24,7 +24,21 @@
  *====================*/
 
 /*Color depth: 1 (1 byte per pixel), 8 (RGB332), 16 (RGB565), 32 (ARGB8888)*/
-#define LV_COLOR_DEPTH 16
+#define LV_COLOR_DEPTH 1
+
+/* See: https://blog.lvgl.io/2019-05-06/oled */
+#define LV_MEM_SIZE             (2U * 1024U)    /* Size memory used by `lv_mem_alloc` in bytes (>= 2kB) */
+#define LV_HOR_RES              (128)
+#define LV_VER_RES              (64)
+#define LV_ANTIALIAS            0               /* 1: Enable anti-aliasing */
+
+#define LV_COLOR_DEPTH          1               /* Color depth: 1/8/16/32 */
+#define USE_LV_SHADOW           0               /* 1: Enable shadows */
+#define USE_LV_GROUP            0               /* 1: Enable object groups (for keyboards) */
+#define USE_LV_GPU              0               /* 1: Enable GPU interface */
+#define USE_LV_REAL_DRAW        0               /* 1: Enable function which draw directly to the frame buffer instead of VDB (required if LV_VDB_SIZE = 0) */
+#define USE_LV_FILESYSTEM       0               /* 1: Enable file system (might be required for images */
+#define USE_LV_LOG              0               /* Enable/disable the log module */
 
 /*Swap the 2 bytes of RGB565 color. Useful if the display has an 8-bit interface (e.g. SPI)*/
 #define LV_COLOR_16_SWAP 0
